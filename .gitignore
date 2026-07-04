@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# 模型文件
+models/
+*.pt
+*.pth
+
+# 生成输出
+generated_output.txt
+*.out
+
+# 笔记
+笔记/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 压缩包
+*.zip
+*.rar
+*.7z
