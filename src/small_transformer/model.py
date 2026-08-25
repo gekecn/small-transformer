@@ -91,7 +91,11 @@ class ChineseGPT(nn.Module):
         super().__init__()
         self.vocab_size = vocab_size
         self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
         self.max_seq_len = max_seq_len
+        self.dropout_rate = dropout
         
         # Token嵌入
         self.token_embedding = nn.Embedding(vocab_size, embed_dim)
@@ -161,14 +165,39 @@ class ChineseGPT(nn.Module):
         
         return logits
     
-    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
+    def generate(
+        self,
+        idx,
+        max_new_tokens,
+        temperature=0.6,
+        top_k=20,
+        repetition_penalty=1.05,
+        repetition_window=64,
+        no_repeat_ngram_size=4,
+        forbidden_token_ids=None,
+    ):
         """
         生成文本
         idx: [batch_size, seq_len] 输入token
         max_new_tokens: 要生成的token数量
         temperature: 温度参数（控制随机性）
         top_k: 只从top_k个最可能的token中选择
+        repetition_penalty: 对近期已经出现的字符施加轻度惩罚；1.0表示关闭
+        repetition_window: 只检查最近多少个字符，避免长期上下文被过度惩罚
+        no_repeat_ngram_size: 禁止再次生成完全相同的N字符片段；0表示关闭
+        forbidden_token_ids: 生成时禁止采样的特殊token编号
         """
+        if temperature <= 0:
+            raise ValueError("temperature 必须大于0")
+        if top_k is not None and top_k <= 0:
+            raise ValueError("top_k 必须大于0或设为None")
+        if repetition_penalty < 1.0:
+            raise ValueError("repetition_penalty 不能小于1.0")
+        if repetition_window <= 0:
+            raise ValueError("repetition_window 必须大于0")
+        if no_repeat_ngram_size < 0:
+            raise ValueError("no_repeat_ngram_size 不能小于0")
+
         for _ in range(max_new_tokens):
             # 如果序列太长，截断
             idx_cond = idx if idx.size(1) <= self.max_seq_len else idx[:, -self.max_seq_len:]
@@ -181,6 +210,42 @@ class ChineseGPT(nn.Module):
             
             # 温度调整
             logits = logits / temperature
+
+            # 只轻度惩罚近期出现过的字符。字符级模型如果惩罚整个上下文，
+            # 常用汉字和标点也会被压得过低，因此限制在短窗口内。
+            if repetition_penalty != 1.0:
+                recent = idx[:, -repetition_window:]
+                for batch_index in range(idx.size(0)):
+                    token_ids = torch.unique(recent[batch_index])
+                    token_logits = logits[batch_index, token_ids]
+                    logits[batch_index, token_ids] = torch.where(
+                        token_logits < 0,
+                        token_logits * repetition_penalty,
+                        token_logits / repetition_penalty,
+                    )
+
+            # 禁止重复完整N-gram，主要抑制“巨大的巨大的”和短循环，
+            # 同时允许正常复用单字、词语及对话标点。
+            if no_repeat_ngram_size >= 2 and idx.size(1) >= no_repeat_ngram_size - 1:
+                n = no_repeat_ngram_size
+                for batch_index in range(idx.size(0)):
+                    sequence = idx[batch_index].tolist()
+                    prefix = tuple(sequence[-(n - 1):])
+                    banned = {
+                        sequence[start + n - 1]
+                        for start in range(len(sequence) - n + 1)
+                        if tuple(sequence[start:start + n - 1]) == prefix
+                    }
+                    if banned:
+                        logits[batch_index, list(banned)] = -float('Inf')
+
+            if forbidden_token_ids:
+                valid_ids = [
+                    int(token_id) for token_id in forbidden_token_ids
+                    if 0 <= int(token_id) < logits.size(-1)
+                ]
+                if valid_ids:
+                    logits[:, valid_ids] = -float('Inf')
             
             # Top-k过滤
             if top_k is not None:
@@ -202,6 +267,18 @@ class ChineseGPT(nn.Module):
         """统计参数数量"""
         return sum(p.numel() for p in self.parameters())
 
+    def get_config(self):
+        """返回重建模型所需的可序列化配置。"""
+        return {
+            'vocab_size': self.vocab_size,
+            'embed_dim': self.embed_dim,
+            'num_heads': self.num_heads,
+            'hidden_dim': self.hidden_dim,
+            'num_layers': self.num_layers,
+            'max_seq_len': self.max_seq_len,
+            'dropout': self.dropout_rate,
+        }
+
 
 if __name__ == '__main__':
     # 测试模型
@@ -216,5 +293,5 @@ if __name__ == '__main__':
     print(f"输出形状: {logits.shape}")
     
     # 测试生成
-    generated = model.generate(idx[:1, :10], max_new_tokens=20, temperature=1.0, top_k=50)
+    generated = model.generate(idx[:1, :10], max_new_tokens=20)
     print(f"生成序列长度: {generated.shape}")

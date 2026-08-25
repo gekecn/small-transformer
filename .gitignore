@@ -18,6 +18,8 @@ generated_output.txt
 
 # 笔记
 笔记/
+PROJECT_MEMO.md
+.codex_*/
 
 # 系统文件
 .DS_Store

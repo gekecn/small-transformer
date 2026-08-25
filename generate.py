@@ -3,56 +3,64 @@
 """
 
 import torch
-import os
+import argparse
+from src.small_transformer.model_io import load_trained_model
 
-from src.small_transformer.model import ChineseGPT
-from src.small_transformer.dataset import create_dataloader
+
+DEFAULT_PROMPTS = [
+    "火星",
+    "机器人",
+    "飞船",
+    "星空",
+]
 
 def main():
+    parser = argparse.ArgumentParser(description="使用训练好的微型Transformer生成文本")
+    parser.add_argument('--run-dir', help="指定某次训练的run目录")
+    parser.add_argument('--checkpoint', help="直接指定checkpoint文件")
+    parser.add_argument(
+        '--prompt', action='append',
+        help="生成提示词，一个词即可；可重复提供",
+    )
+    parser.add_argument('--max-new-tokens', type=int, default=200)
+    parser.add_argument('--temperature', type=float, default=0.6)
+    parser.add_argument('--top-k', type=int, default=20)
+    parser.add_argument('--repetition-penalty', type=float, default=1.05)
+    parser.add_argument('--no-repeat-ngram-size', type=int, default=4)
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--output', default='generated_output.txt')
+    args = parser.parse_args()
+
     print("=" * 60)
     print("测试模型生成效果")
     print("=" * 60)
-    
+
     device = 'cpu'
-    save_dir = 'models'
-    
-    print("加载数据和Tokenizer...")
-    dataloader, tokenizer = create_dataloader(
-        'data',
-        batch_size=4,
-        max_seq_len=256
-    )
-    
-    print(f"词表大小: {tokenizer.vocab_size}")
-    
-    print("\n创建模型...")
-    model = ChineseGPT(
-        vocab_size=tokenizer.vocab_size,
-        embed_dim=256,
-        num_heads=4,
-        hidden_dim=512,
-        num_layers=4,
-        max_seq_len=256,
-        dropout=0.1
-    ).to(device)
-    
-    checkpoint_path = os.path.join(save_dir, 'model_epoch_50.pt')
-    
-    if os.path.exists(checkpoint_path):
-        print(f"\n加载模型: model_epoch_50.pt")
-        checkpoint = torch.load(checkpoint_path, map_location=device)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        
-        epoch = checkpoint['epoch']
-        loss = checkpoint.get('loss', 'N/A')
-        print(f"训练到Epoch: {epoch}, Loss: {loss}")
-    else:
-        print("\n⚠️ 未找到模型checkpoint")
+    model_root = 'models'
+    try:
+        model, tokenizer, checkpoint, checkpoint_path, run_dir, inferred = load_trained_model(
+            model_root,
+            checkpoint=args.checkpoint,
+            run_dir=args.run_dir,
+            device=device,
+        )
+    except FileNotFoundError as error:
+        print(f"无法生成：{error}")
         return
+    print(f"运行目录: {run_dir}")
+    print(f"模型文件: {checkpoint_path}")
+
+    print("已加载与模型配套的Tokenizer。")
+    print(f"词表大小: {tokenizer.vocab_size}")
+    if inferred:
+        print("提示：旧checkpoint没有模型配置，已按本项目历史配置推断（注意力头数=4）。")
+    epoch = checkpoint['epoch']
+    loss = checkpoint.get('val_loss', checkpoint.get('loss', 'N/A'))
+    print(f"训练到Epoch: {epoch}, 验证Loss: {loss}")
     
     model.eval()
     
-    test_prompts = ["在", "银河", "未来", "科技", "星际", "人类", "宇宙", "城市"]
+    test_prompts = args.prompt or DEFAULT_PROMPTS
     
     output_lines = []
     
@@ -61,24 +69,30 @@ def main():
         print(header)
         output_lines.append(header)
         
-        for temp in [0.5, 0.7, 1.0]:
-            for top_k_val in [20, 50]:
-                idx = torch.tensor([tokenizer.encode(prompt)], dtype=torch.long).to(device)
-                
-                with torch.no_grad():
-                    generated = model.generate(
-                        idx,
-                        max_new_tokens=200,
-                        temperature=temp,
-                        top_k=top_k_val
-                    )
-                
-                text = tokenizer.decode(generated[0].tolist())
-                result = f"  temp={temp}, top_k={top_k_val}:\n    {text}"
-                print(result)
-                output_lines.append(result)
+        torch.manual_seed(args.seed)
+        idx = torch.tensor([tokenizer.encode(prompt)], dtype=torch.long).to(device)
+
+        with torch.no_grad():
+            generated = model.generate(
+                idx,
+                max_new_tokens=args.max_new_tokens,
+                temperature=args.temperature,
+                top_k=args.top_k,
+                repetition_penalty=args.repetition_penalty,
+                no_repeat_ngram_size=args.no_repeat_ngram_size,
+                forbidden_token_ids=tokenizer.special_token_ids,
+            )
+
+        text = tokenizer.decode(generated[0].tolist())
+        result = (
+            f"  temp={args.temperature}, top_k={args.top_k}, "
+            f"repetition_penalty={args.repetition_penalty}, "
+            f"no_repeat_ngram={args.no_repeat_ngram_size}:\n    {text}"
+        )
+        print(result)
+        output_lines.append(result)
     
-    output_file = 'generated_output.txt'
+    output_file = args.output
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write('\n'.join(output_lines))
     
