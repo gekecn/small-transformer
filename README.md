@@ -112,12 +112,12 @@ python main.py --tokenizer char --tokenizer-vocab-size 5000
 
 ## 📊 训练数据
 
-仓库内包含程序运行所需的全部训练语料：约1,209万字符，共2,245个训练文本（以章节为主）：
+仓库内包含程序运行所需的全部训练语料：约1,206万字符，共2,239个训练文本（以章节为主）：
 
 - `cc0_space_grimoire_zh_hans.txt`：约166万字符，276篇文档；
 - `local_demo_scifi_mixed_zh_hans.txt`：约459万字符，529篇文档；
 - `original_scifi_selected_zh_hans.txt`：3篇人工筛选并扩写的原创短篇；
-- `scifi_fiction_zh_hans.txt`：《新石头记》的未来文明篇与《月界旅行》，约12.7万字符、34篇文档；
+- `scifi_fiction_zh_hans.txt`：《新石头记》的未来文明篇与《月界旅行》，约9.6万字符、28篇文档；
 - `scifi_magazine_multi_author_zh_hans.txt`：约571万字符，1,403篇多作者科幻文本。
 
 默认训练只读取`data_scifi/`，因此不会混入新闻、百科、问答或通用网页文本。
