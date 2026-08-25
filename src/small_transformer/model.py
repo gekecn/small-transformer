@@ -171,7 +171,7 @@ class ChineseGPT(nn.Module):
         max_new_tokens,
         temperature=0.6,
         top_k=20,
-        repetition_penalty=1.05,
+        repetition_penalty=1.18,
         repetition_window=64,
         no_repeat_ngram_size=4,
         forbidden_token_ids=None,

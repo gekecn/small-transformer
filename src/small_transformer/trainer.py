@@ -206,7 +206,7 @@ class NovelTrainer:
         max_new_tokens=100,
         temperature=0.6,
         top_k=20,
-        repetition_penalty=1.05,
+        repetition_penalty=1.18,
         no_repeat_ngram_size=4,
     ):
         """生成样本文本"""

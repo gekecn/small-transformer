@@ -34,7 +34,7 @@ def main():
     parser.add_argument('--max-new-tokens', type=int, default=200)
     parser.add_argument('--temperature', type=float, default=0.6)
     parser.add_argument('--top-k', type=int, default=20)
-    parser.add_argument('--repetition-penalty', type=float, default=1.05)
+    parser.add_argument('--repetition-penalty', type=float, default=1.18)
     parser.add_argument('--no-repeat-ngram-size', type=int, default=4)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--output', default='generated_output.txt')
