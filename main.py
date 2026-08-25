@@ -7,11 +7,19 @@ import argparse
 from datetime import datetime
 import hashlib
 import os
+import sys
 from pathlib import Path
 
 from src.small_transformer.model import ChineseGPT
 from src.small_transformer.dataset import create_train_val_dataloaders
 from src.small_transformer.trainer import NovelTrainer
+
+
+def configure_console_output():
+    """避免生成文本中的生僻字符使Windows控制台输出崩溃。"""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(errors='replace')
 
 
 def find_latest_checkpoint(run_dir):
@@ -84,6 +92,7 @@ def load_initial_weights(model, tokenizer, checkpoint_path, current_data_manifes
 
 
 def main():
+    configure_console_output()
     parser = argparse.ArgumentParser(description="训练中文微型Transformer")
     parser.add_argument(
         '--resume-run',

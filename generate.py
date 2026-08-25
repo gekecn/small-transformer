@@ -4,6 +4,7 @@
 
 import torch
 import argparse
+import sys
 from src.small_transformer.model_io import load_trained_model
 
 
@@ -14,7 +15,15 @@ DEFAULT_PROMPTS = [
     "星空",
 ]
 
+
+def configure_console_output():
+    """避免生成文本中的生僻字符使Windows控制台输出崩溃。"""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(errors='replace')
+
 def main():
+    configure_console_output()
     parser = argparse.ArgumentParser(description="使用训练好的微型Transformer生成文本")
     parser.add_argument('--run-dir', help="指定某次训练的run目录")
     parser.add_argument('--checkpoint', help="直接指定checkpoint文件")
